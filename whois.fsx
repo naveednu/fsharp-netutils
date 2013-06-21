@@ -10,14 +10,17 @@ let whois (domainName: string) : string =
     stream.Write(bytes, 0, bytes.Length)
     stream.Flush()
     
-    let rec reader (acc:StringBuilder): string =
+    let rec reader (acc): string =
         let buf = Array.zeroCreate 512
         let bytesread = stream.Read(buf, 0, 512)
         if bytesread > 0 then
-            reader (acc.Append(Encoding.ASCII.GetString(buf)))
+            reader (acc + Encoding.ASCII.GetString(buf))
         else
-            acc.ToString()
-    reader (new StringBuilder())
+            acc
+    reader ""
     
-let response = whois "google.com"
-printfn "%s" response
+if fsi.CommandLineArgs.Length < 2 then
+    printfn "Usage: %s <domain>" fsi.CommandLineArgs.[0]
+    exit(0)
+let domain = fsi.CommandLineArgs.[1]
+printfn "%s" (whois domain)
