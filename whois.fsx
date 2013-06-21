@@ -6,7 +6,7 @@ let whois (domainName: string) : string =
     let whoisServer = "whois.verisign-grs.com"
     let client = new TcpClient(whoisServer, 43)
     let stream = client.GetStream()
-    let bytes = Encoding.ASCII.GetBytes("domain" + domainName + "\r\n")
+    let bytes = Encoding.ASCII.GetBytes("domain " + domainName + "\r\n")
     stream.Write(bytes, 0, bytes.Length)
     stream.Flush()
     
