@@ -1,4 +1,4 @@
 fsharp-netutils
 ===============
 
-F# network utils
+F# network utilities
