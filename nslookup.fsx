@@ -39,22 +39,22 @@ type Answer(data:byte[], start:int) =
     member x.RDLength = Bytes2Int16 data.[pos+8..pos+9]
     member x.RDStart = pos+10
    
-    member this.print()=
-        printfn "answer name = %s, type = %d, class = %d rlength =%d, rdstart = %d" (this.QName) this.Type this.Class this.RDLength this.RDStart
-    member this.printRecord()=
-        if this.Type = (int16)QueryType.MX then
-            let name, _ = parseQName "" data (this.RDStart+2)
-            printfn "%s\tmail exchanger = %d %s" this.QName (Bytes2Int16 data.[this.RDStart..this.RDStart+2]) name
-        else if this.Type = (int16) QueryType.CNAME then
-            let name, _ = parseQName "" data (this.RDStart)
-            printfn "%s    canonical name = %s" this.QName name
-        else if this.Type = (int16) QueryType.A then
-            printfn "Name:   %s" this.QName
+    member x.print()=
+        printfn "answer name = %s, type = %d, class = %d rlength =%d, rdstart = %d" (x.QName) x.Type x.Class x.RDLength x.RDStart
+    member x.printRecord()=
+        if x.Type = (int16)QueryType.MX then
+            let exchange, _ = parseQName "" data (x.RDStart+2)
+            printfn "%s\tmail exchanger = %d %s" x.QName (Bytes2Int16 data.[x.RDStart..x.RDStart+2]) exchange
+        else if x.Type = (int16) QueryType.CNAME then
+            let cname, _ = parseQName "" data (x.RDStart)
+            printfn "%s    canonical name = %s" x.QName cname
+        else if x.Type = (int16) QueryType.A then
+            printfn "Name:   %s" x.QName
             printf "Address: "
             Array.iteri (fun i octet -> 
                           match i with
                           | 3 -> printf "%d\n" (int(octet))
-                          | _ -> printf "%d." (int(octet))) data.[this.RDStart..this.RDStart+3]
+                          | _ -> printf "%d." (int(octet))) data.[x.RDStart..x.RDStart+3]
                           
 type ResponsePacket(data:byte[]) = 
 
