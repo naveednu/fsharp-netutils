@@ -17,7 +17,7 @@ let rec parseQName (acc) (data:byte[]) (start:int) =
             let temp = data.[pos+1..pos+len]
             parseQName (acc + Encoding.ASCII.GetString([|for x in temp-> byte(x)|])+".") (data) (pos+len+1) 
     else
-        acc.Trim([|'.'|]), (start+1)
+        acc, (start+1)
     
 type QueryType =
     | A = 1s
@@ -32,7 +32,7 @@ type Question = {
         
 type Answer(data:byte[], start:int) = 
     let name, pos = parseQName "" data start
-    member x.QName = name
+    member x.QName = name.TrimEnd([|'.'|])
     member x.Type = Bytes2Int16 data.[pos..pos+1]
     member x.Class = Bytes2Int16 data.[pos+2..pos+3] 
     member x.TTL = int data.[pos+4]
@@ -44,34 +44,37 @@ type Answer(data:byte[], start:int) =
     member this.printRecord()=
         if this.Type = (int16)QueryType.MX then
             let name, _ = parseQName "" data (this.RDStart+2)
-            printfn "Exchange: %s, Preference: %d" name (Bytes2Int16 data.[this.RDStart..this.RDStart+2])
+            printfn "%s\tmail exchanger = %d %s" this.QName (Bytes2Int16 data.[this.RDStart..this.RDStart+2]) name
         else if this.Type = (int16) QueryType.CNAME then
             let name, _ = parseQName "" data (this.RDStart)
-            printfn "CNAME: %s" name
+            printfn "%s    canonical name = %s" this.QName name
         else if this.Type = (int16) QueryType.A then
-            printf "IP Address: "
+            printfn "Name:   %s" this.QName
+            printf "Address: "
             Array.iteri (fun i octet -> 
                           match i with
                           | 3 -> printf "%d\n" (int(octet))
                           | _ -> printf "%d." (int(octet))) data.[this.RDStart..this.RDStart+3]
                           
 type ResponsePacket(data:byte[]) = 
+
     let mutable _ansPosition = 0
+    do 
+        let qname, pos = parseQName "" data 12
+        let question = {Name=qname; Type = Bytes2Int16 data.[pos..pos+1]; Class = Bytes2Int16 data.[pos+2..pos+3]}
+        _ansPosition <- pos+4
+
     member x.TransId =  Bytes2Int16 data.[0..1]
     member x.Flags = Bytes2Int16 data.[2..3]
-    member x.Questions = Bytes2Int16 data.[4..5]
+    member x.NumQuestions = Bytes2Int16 data.[4..5]
     member x.NumAnswers = Bytes2Int16 data.[6..7]
     member x.Authority = Bytes2Int16 data.[8..9]
     member x.Additional = Bytes2Int16 data.[10..11]
     
     member x.PrintDescription()=
-        printfn "Questions = %d, Answers = %d TransId = %d" x.Questions x.NumAnswers x.TransId
+        printfn "Questions = %d, Answers = %d TransId = %d" x.NumQuestions x.NumAnswers x.TransId
         
-    member x.GetQuestion() =
-        let qname, pos = parseQName "" data 12
-        let question = {Name=qname; Type = Bytes2Int16 data.[pos..pos+1]; Class = Bytes2Int16 data.[pos+2..pos+3]}
-        _ansPosition <- pos+4
-        question
+
     member x.GetAnswers()=
         let rec _gans (acc) (pos) (num) =
             if num > 0 then
@@ -102,11 +105,18 @@ let nslookup(domainName: string, queryType: QueryType) =
         exit(0)
     
     let packet = new ResponsePacket(result)
-    packet.PrintDescription()
-    let question = packet.GetQuestion()
-    printfn "Name = %s Type= %d Class = %d" question.Name question.Type question.Class
     for n in packet.GetAnswers() do
         n.printRecord()
 
-nslookup("live.com", QueryType.MX)
-    
+if fsi.CommandLineArgs.Length < 3 then
+    printfn "Usage: %s <domain> <query>" fsi.CommandLineArgs.[0]
+    exit(0)
+let domain = fsi.CommandLineArgs.[1]
+let query = fsi.CommandLineArgs.[2]
+
+match query.ToLower() with
+| "mx" -> nslookup(domain, QueryType.MX)
+| "a" -> nslookup(domain, QueryType.A)
+| "cname" -> nslookup(domain, QueryType.CNAME)
+| _ -> printfn "Unknwon query specificed"
+
