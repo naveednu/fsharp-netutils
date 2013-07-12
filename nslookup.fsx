@@ -22,8 +22,8 @@ let rec parseQName (acc) (data:byte[]) (start:int) =
             let result, _ = parseQName (acc) (data) (int data.[pos+1])
             result, (start+2)
         else
-            let temp = data.[pos+1..pos+len]
-            parseQName (acc + Encoding.ASCII.GetString([|for x in temp-> byte(x)|])+".") (data) (pos+len+1) 
+            let res = data.[pos+1..pos+len] |> Seq.map (fun x -> (sprintf "%c" (char(x)))) |> String.concat ""
+            parseQName (acc + res + ".") (data) (pos+len+1) 
     else
         acc, (start+1)
     
@@ -32,6 +32,8 @@ type QueryType =
     | NS = 2s
     | CNAME = 5s
     | MX = 15s
+    | AAAA = 28s
+    | ANY = 255s
     
 type Question = {
     Name: string;
@@ -50,6 +52,18 @@ type Answer(data:byte[], start:int) =
    
     member x.print()=
         printfn "answer name = %s, type = %d, class = %d rlength =%d, rdstart = %d" (x.QName) x.Type x.Class x.RDLength x.RDStart
+        
+    member x.ParseIpv6()=
+        let result = seq {for i in 0..2..15 -> (sprintf "%x" (Bytes2Int16 data.[x.RDStart+i..x.RDStart+i+1]))}
+                      |> String.concat ":"
+          
+        let rgx = new RegularExpressions.Regex("(0:0)+(:0)*")
+        let address = rgx.Replace(result, "",1)
+        match (address.Length) with
+        | 0 -> "::"
+        | 2 -> sprintf ":%s" address
+        | _ -> address
+                
     member x.printRecord()=
         let qtype = QueryType.ToObject(typeof<QueryType>, x.Type) :?> QueryType
         match qtype with
@@ -65,11 +79,15 @@ type Answer(data:byte[], start:int) =
         | QueryType.A ->
             printfn "Name:   %s" x.QName
             printf "Address: "
-            Array.iteri (fun i octet -> 
-                          match i with
-                          | 3 -> printf "%d\n" (int(octet))
-                          | _ -> printf "%d." (int(octet))) data.[x.RDStart..x.RDStart+3]
-        | _ -> printfn "Invalid type"
+            let result = seq {for x in data.[x.RDStart..x.RDStart+3] -> (sprintf "%d" (int(x)))}
+                      |> String.concat "."
+            printfn "%s" result
+                         
+        | QueryType.AAAA -> 
+            printfn "%s has AAAA address %s" x.QName (x.ParseIpv6())
+              
+        | _ -> printfn ""
+        
                           
 type ResponsePacket(data:byte[]) = 
 
@@ -115,11 +133,10 @@ let nslookup(domainName: string, queryType: QueryType) =
     let ipe = new IPEndPoint(IPAddress.Any, 0)
     let result = udpClient.Receive(ref ipe)
       
-    let response = [|for x in result -> int(x)|]
-    if response.[3] <> 128 then
+    if int(result.[3]) <> 128 then
         printfn "Invalid response"
         exit(0)
-    let mutable answers = response.[7]
+    let mutable answers = int(result.[7])
     if answers = 0 then 
         printfn "No answers in response."
         exit(0)
@@ -140,5 +157,7 @@ match query.ToLower() with
 | "a" -> nslookup(domain, QueryType.A)
 | "cname" -> nslookup(domain, QueryType.CNAME)
 | "ns" -> nslookup(domain, QueryType.NS)
+| "aaaa" -> nslookup(domain, QueryType.AAAA)
+| "any" -> nslookup(domain, QueryType.ANY)
 | _ -> printfn "Unknwon query specificed"
 
