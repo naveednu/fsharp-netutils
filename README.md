@@ -9,11 +9,14 @@ Collection of F# scripts to perform different tasks including whois, nslookup
 
 `> fsi.exe whois.fsx google.com`
 
-**nslookup** - Provide domain name and query type as arguments to nslookup.fsx *(supported query types are A, MX, CNAME)*
+**nslookup** - Provide domain name and query type as arguments to nslookup.fsx *(supported query types are: A, NS, MX, CNAME)*
 
 `> fsi.exe nslookup.fsx google.com MX`
 
 `> fsi.exe nslookup.fsx yahoo.com A`
+
+`> fsi.exe nslookup.fsx yahoo.com NS`
+
 
 
 
